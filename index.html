@@ -561,6 +561,26 @@ function drawChart(stateName) {
   ctx.fillStyle = diff >= 0 ? '#16a34a' : '#dc2626';
   ctx.fillText(diffLabel, midX, padT - 15);
 
+  // Small legend — top right of chart
+  const legX = padL + plotW - 8;
+  const legY = padT + 14;
+  const swatchW = 18, swatchH = 3, gap = 6, rowH = 16;
+
+  ctx.font = `11px 'Syne', sans-serif`;
+  ctx.textAlign = 'right';
+
+  // 2024 row
+  ctx.fillStyle = '#b41e1e';
+  ctx.fillRect(legX - swatchW, legY - swatchH / 2, swatchW, swatchH);
+  ctx.fillStyle = '#444';
+  ctx.fillText('2024', legX - swatchW - gap, legY + 4);
+
+  // 2013 row
+  ctx.fillStyle = '#3b6ea5';
+  ctx.fillRect(legX - swatchW, legY + rowH - swatchH / 2, swatchW, swatchH);
+  ctx.fillStyle = '#444';
+  ctx.fillText('2013', legX - swatchW - gap, legY + rowH + 4);
+
   // X labels every 5 bins, up to X_MAX_IDX
   ctx.fillStyle = '#a09488';
   ctx.font = `9px 'Space Mono', monospace`;
