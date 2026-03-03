@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAEP Score Distribution Explorer</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f9f7f4;
+    --surface: #ffffff;
+    --surface2: #f0ede8;
+    --border: #e2ddd6;
+    --text: #1a1714;
+    --muted: #8c8075;
+    --accent: #2563eb;
+    --col2024: #b41e1e;
+    --col2013: #3b6ea5;
+    --shift-pos: #16a34a;
+    --shift-neg: #dc2626;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  header {
+    padding: 28px 40px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+    background: var(--surface);
+  }
+  header h1 {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--text);
+  }
+  header .sub {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+  }
+
+  .controls {
+    padding: 20px 40px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex-wrap: wrap;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .controls label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  select {
+    background: var(--surface);
+    color: var(--text);
+    border: 1.5px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238c8075' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 28px;
+    min-width: 220px;
+    transition: border-color 0.2s;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  }
+  select:hover, select:focus { border-color: var(--accent); outline: none; }
+
+  .legend {
+    display: flex;
+    gap: 20px;
+    margin-left: auto;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .legend-swatch {
+    width: 24px;
+    height: 3px;
+    border-radius: 2px;
+  }
+  .swatch-2024 { background: var(--col2024); }
+  .swatch-2013 { background: var(--col2013); }
+
+  .main {
+    flex: 1;
+    padding: 30px 40px 40px;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    gap: 20px;
+    max-width: 1100px;
+    margin: 0 auto;
+    width: 100%;
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 18px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .stat-card .label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+  .stat-card .value {
+    font-family: 'Space Mono', monospace;
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text);
+  }
+  .stat-card .value.positive { color: var(--shift-pos); }
+  .stat-card .value.negative { color: var(--shift-neg); }
+  .stat-card .sub-value {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-top: 3px;
+  }
+
+  .chart-container {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 20px 60px 20px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+
+  canvas#chart {
+    width: 100%;
+    display: block;
+  }
+
+  .x-axis-labels {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 20px 0;
+    position: absolute;
+    bottom: 16px;
+    left: 0;
+    right: 0;
+  }
+  .x-axis-labels span {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+  }
+
+  .tooltip {
+    position: fixed;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+    font-family: 'Space Mono', monospace;
+    font-size: 12px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 100;
+    min-width: 160px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  }
+  .tooltip .tt-range { font-weight: 700; color: var(--text); margin-bottom: 6px; font-size: 13px; }
+  .tooltip .tt-row { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 3px; }
+  .tooltip .tt-label { color: var(--muted); }
+  .tooltip .tt-val24 { color: #b41e1e; font-weight: 700; }
+  .tooltip .tt-val13 { color: #3b6ea5; font-weight: 700; }
+  .tooltip .tt-diff { color: var(--text); font-weight: 700; }
+  .tt-sep { border-top: 1px solid var(--border); margin: 6px 0; }
+
+  .shift-bar-section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+  }
+  .shift-bar-section h3 {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .shift-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .shift-bar-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 18px;
+  }
+  .shift-bar-label {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    color: var(--muted);
+    width: 60px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .shift-bar-track {
+    flex: 1;
+    height: 6px;
+    background: #ede9e3;
+    border-radius: 3px;
+    position: relative;
+    overflow: hidden;
+  }
+  .shift-bar-fill {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.4s ease;
+  }
+  .shift-bar-fill.pos { background: var(--shift-pos); left: 50%; }
+  .shift-bar-fill.neg { background: var(--shift-neg); right: 50%; }
+  .shift-bar-center {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    width: 1px;
+    height: 100%;
+    background: #c8bfb4;
+  }
+  .shift-bar-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 9px;
+    width: 36px;
+    flex-shrink: 0;
+    text-align: left;
+  }
+  .shift-bar-val.pos { color: var(--shift-pos); }
+  .shift-bar-val.neg { color: var(--shift-neg); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>NAEP Score Distribution Explorer</h1>
+  <span class="sub">4th Grade Reading · State-by-State · 2013 vs 2024</span>
+</header>
+
+<div class="controls">
+  <label for="stateSelect">State / Jurisdiction</label>
+  <select id="stateSelect"></select>
+
+  <div class="legend">
+    <div class="legend-item">
+      <div class="legend-swatch swatch-2013"></div>
+      <span>2013</span>
+    </div>
+    <div class="legend-item">
+      <div class="legend-swatch swatch-2024"></div>
+      <span>2024</span>
+    </div>
+  </div>
+</div>
+
+<div class="main">
+  <div class="stats-row" id="statsRow"></div>
+
+  <div class="chart-container" id="chartContainer">
+    <canvas id="chart"></canvas>
+  </div>
+
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script>
+const NAEP_DATA = {"bins":["0-10","10-20","20-30","30-40","40-50","50-60","60-70","70-80","80-90","90-100","100-110","110-120","120-130","130-140","140-150","150-160","160-170","170-180","180-190","190-200","200-210","210-220","220-230","230-240","240-250","250-260","260-270","270-280","280-290","290-300","300-310","310-320","320-330","330-340","340-350","350-360","360-370","370-380","380-390","390-400","400-410","410-420","420-430","430-440","440-450","450-460","460-470","470-480","480-490","490-500"],"states":{"National":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,3,4,5,6,7,8,9,10,10,9,7,5,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,5,7,9,10,12,12,11,9,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":215.0,"avg2013":221.8},"Alabama":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,4,4,6,7,8,9,10,10,9,8,7,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,6,8,10,11,12,12,10,8,5,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":213.2,"avg2013":218.6},"Alaska":{"2024":[0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,6,7,7,8,9,9,8,8,7,5,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,1,1,1,1,2,2,3,3,4,5,6,7,8,10,11,10,9,7,5,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":201.6,"avg2013":209.3},"Arizona":{"2024":[0,0,0,0,0,0,0,0,0,1,1,1,2,3,3,4,5,6,7,7,8,9,9,9,7,6,4,3,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,3,4,5,7,8,10,11,11,11,9,7,4,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":208.1,"avg2013":213.1},"Arkansas":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,6,6,7,8,9,10,9,8,7,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,4,5,7,9,11,12,12,11,8,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":209.7,"avg2013":218.5},"California":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,4,5,6,7,7,9,9,9,9,8,7,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,6,7,8,10,10,11,10,9,7,4,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":211.7,"avg2013":212.5},"Colorado":{"2024":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,4,5,6,7,8,9,10,10,9,8,6,4,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,4,6,8,10,12,12,12,10,8,5,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":220.9,"avg2013":226.7},"Connecticut":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,6,6,8,9,9,10,9,8,7,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,6,8,10,12,12,12,10,8,5,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":219.2,"avg2013":229.6},"Delaware":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,6,7,7,9,10,10,10,8,6,4,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,5,7,9,11,12,13,12,10,7,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":209.5,"avg2013":225.8},"District of Columbia":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,2,3,4,5,5,6,7,7,8,7,7,7,7,6,5,4,3,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,4,5,7,8,9,9,10,9,8,7,5,4,2,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":209.2,"avg2013":205.6},"Florida":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,5,6,7,9,9,10,10,9,7,6,4,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,4,6,9,11,13,13,12,10,7,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":218.2,"avg2013":227.5},"Georgia":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,3,4,5,6,7,8,9,10,10,8,7,5,3,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,4,6,8,9,11,11,11,10,8,6,4,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":214.4,"avg2013":221.8},"Hawaii":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,6,7,8,10,10,10,9,8,6,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,3,4,5,6,8,9,10,11,11,9,7,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":215.8,"avg2013":214.8},"Idaho":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,6,7,8,9,10,11,10,8,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,3,4,5,7,9,11,12,12,11,8,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":215.7,"avg2013":219.3},"Illinois":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,4,4,5,6,7,8,9,10,10,8,7,5,4,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,3,4,6,7,9,10,11,11,10,8,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":214.2,"avg2013":218.5},"Indiana":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,3,4,6,7,9,10,11,10,10,8,6,4,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,6,9,11,12,13,12,10,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":220.1,"avg2013":225.3},"Iowa":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,6,8,9,10,11,10,9,7,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,2,3,4,6,8,10,12,13,11,10,7,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":214.6,"avg2013":223.8},"Kansas":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,6,7,9,10,11,11,9,7,5,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,5,6,8,10,12,12,12,9,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":213.1,"avg2013":223.4},"Kentucky":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,5,6,7,9,10,10,10,9,7,6,4,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,4,5,7,9,11,12,12,11,9,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":218.0,"avg2013":224.4},"Louisiana":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,6,7,8,10,10,10,9,7,6,4,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,6,7,9,11,12,11,10,8,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":216.0,"avg2013":210.5},"Maine":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,5,6,7,8,9,10,10,10,8,7,4,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,3,5,7,9,11,12,12,11,9,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":209.6,"avg2013":224.8},"Maryland":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,5,6,7,8,8,9,9,8,7,6,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,4,6,8,10,11,12,12,10,8,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":215.6,"avg2013":232.1},"Massachusetts":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,4,5,6,7,9,9,10,10,8,7,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,5,7,9,11,13,13,11,9,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":224.8,"avg2013":232.4},"Michigan":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,4,5,6,7,8,9,10,10,9,8,6,4,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,4,6,8,10,11,11,11,10,8,5,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":209.1,"avg2013":217.4},"Minnesota":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,4,5,6,7,9,10,10,11,10,8,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,4,6,8,9,12,12,12,10,8,5,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":214.4,"avg2013":227.0},"Mississippi":{"2024":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,5,6,8,9,11,11,11,10,8,6,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,5,6,8,9,11,11,11,10,8,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":218.5,"avg2013":208.5},"Missouri":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,3,4,5,6,8,9,10,10,10,8,7,4,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,5,7,9,11,12,13,11,9,6,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":211.9,"avg2013":222.3},"Montana":{"2024":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,4,5,6,8,9,10,10,10,10,8,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,4,5,7,9,11,12,12,11,9,6,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":217.2,"avg2013":223.0},"Nebraska":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,4,5,7,7,9,10,10,10,9,7,5,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,5,6,9,10,12,12,12,9,7,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":211.7,"avg2013":223.3},"Nevada":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,3,4,5,6,7,8,9,10,10,9,7,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,2,3,4,6,8,10,11,12,11,9,7,5,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":213.1,"avg2013":213.8},"New Hampshire":{"2024":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,6,7,8,10,11,11,11,8,7,4,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,5,7,10,13,14,14,11,8,5,3,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":221.5,"avg2013":232.0},"New Jersey":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,3,4,5,6,8,9,9,10,9,8,7,5,3,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,6,8,10,12,12,12,10,7,5,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":221.6,"avg2013":228.7},"New Mexico":{"2024":[0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,6,7,7,8,8,9,9,8,7,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,1,1,1,1,2,3,4,5,6,7,8,10,11,11,10,8,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":200.6,"avg2013":205.8},"New York":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,3,4,5,6,7,8,10,9,9,8,7,5,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,4,5,7,8,10,12,12,11,9,7,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":214.6,"avg2013":223.8},"North Carolina":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,4,5,6,7,9,9,10,9,9,7,5,3,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,5,7,9,11,12,12,11,9,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":213.4,"avg2013":222.2},"North Dakota":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,5,7,8,10,11,11,11,10,8,5,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,5,7,9,12,14,14,12,9,5,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":215.5,"avg2013":224.1},"Ohio":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,3,4,5,6,7,8,10,10,10,9,8,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,5,6,8,10,11,12,11,9,7,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":216.0,"avg2013":223.9},"Oklahoma":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,6,7,8,10,10,10,10,8,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,3,4,6,8,10,11,12,12,10,8,5,3,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":207.3,"avg2013":217.0},"Oregon":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,2,3,4,5,5,6,7,7,8,8,9,8,8,6,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,2,3,4,5,7,9,10,11,11,10,8,6,4,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":207.0,"avg2013":219.1},"Pennsylvania":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,3,4,5,6,6,8,9,10,10,10,8,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,6,8,10,12,12,12,10,7,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":215.8,"avg2013":226.4},"Rhode Island":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,3,4,5,6,7,8,9,10,10,9,7,6,4,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,3,3,5,6,8,10,11,12,11,10,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":216.3,"avg2013":222.8},"South Carolina":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,4,5,6,7,8,9,9,9,9,8,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,3,3,5,6,8,10,10,11,11,9,7,5,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":214.9,"avg2013":213.6},"South Dakota":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,6,8,9,11,11,11,9,7,5,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,4,6,7,9,11,12,12,11,8,6,3,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":214.1,"avg2013":217.9},"Tennessee":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,3,4,5,6,7,8,9,10,10,9,7,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,4,5,7,9,10,12,12,11,8,6,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":215.1,"avg2013":219.7},"Texas":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,4,5,5,7,8,9,10,10,10,9,7,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,5,6,8,10,11,12,11,9,7,4,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":211.9,"avg2013":216.9},"Utah":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,4,6,7,7,8,10,11,10,9,7,4,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,2,3,4,6,8,10,12,13,12,9,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":219.3,"avg2013":222.8},"Vermont":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,6,6,7,8,9,10,10,9,7,5,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,4,6,7,10,11,13,12,10,7,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":212.7,"avg2013":228.0},"Virginia":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,3,4,5,6,7,9,9,10,9,8,7,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,6,8,9,11,11,12,10,8,5,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":214.1,"avg2013":228.6},"Washington":{"2024":[0,0,0,0,0,0,0,0,0,0,0,1,1,2,3,3,4,5,6,7,8,9,10,10,9,7,5,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,4,6,8,10,11,12,12,10,7,4,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":215.7,"avg2013":225.0},"West Virginia":{"2024":[0,0,0,0,0,0,0,0,0,0,1,2,2,3,3,4,5,6,7,8,9,9,10,9,8,6,4,2,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,5,6,8,10,11,12,11,10,7,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":205.9,"avg2013":214.7},"Wisconsin":{"2024":[0,0,0,0,0,0,0,0,0,0,1,1,1,2,2,3,4,4,6,7,9,10,10,10,9,8,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,2,3,4,5,7,9,10,11,12,11,8,6,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":215.3,"avg2013":220.8},"Wyoming":{"2024":[0,0,0,0,0,0,0,0,0,0,0,0,1,1,2,2,3,4,5,7,9,10,11,11,11,9,7,4,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"2013":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,2,3,4,6,9,11,13,14,12,10,6,3,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"avg2024":221.9,"avg2013":225.8}}};
+
+const bins = NAEP_DATA.bins;
+const states = NAEP_DATA.states;
+const stateNames = Object.keys(states);
+
+// Populate select
+const sel = document.getElementById('stateSelect');
+stateNames.forEach(name => {
+  const opt = document.createElement('option');
+  opt.value = name;
+  opt.textContent = name;
+  sel.appendChild(opt);
+});
+
+// Canvas setup
+const canvas = document.getElementById('chart');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+
+let currentState = 'National';
+let hoveredBin = -1;
+
+function computeMedian(data) {
+  let cumsum = 0;
+  const total = data.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < data.length; i++) {
+    cumsum += data[i];
+    if (cumsum >= total / 2) {
+      // interpolate within bin
+      const binStart = parseInt(bins[i].split('-')[0]);
+      return binStart + 5;
+    }
+  }
+  return 0;
+}
+
+function computeMean(data) {
+  let sum = 0, total = 0;
+  for (let i = 0; i < data.length; i++) {
+    const mid = (parseInt(bins[i].split('-')[0]) + parseInt(bins[i].split('-')[1])) / 2;
+    sum += mid * data[i];
+    total += data[i];
+  }
+  return total > 0 ? sum / total : 0;
+}
+
+function computePercentBelow(data, threshold) {
+  let below = 0, total = 0;
+  for (let i = 0; i < data.length; i++) {
+    const binEnd = parseInt(bins[i].split('-')[1]);
+    if (binEnd <= threshold) below += data[i];
+    total += data[i];
+  }
+  return total > 0 ? (below / total * 100).toFixed(1) : 0;
+}
+
+function drawChart(stateName) {
+  const stateData = states[stateName];
+  const d24 = stateData['2024'];
+  const d13 = stateData['2013'];
+  const n = bins.length;
+
+  const dpr = window.devicePixelRatio || 1;
+  const container = document.getElementById('chartContainer');
+  const cw = container.clientWidth - 40;
+  const ch = Math.min(340, Math.max(220, cw * 0.38));
+
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+  canvas.width = cw * dpr;
+  canvas.height = ch * dpr;
+  ctx.scale(dpr, dpr);
+
+  const padL = 40, padR = 16, padT = 32, padB = 28;
+  const plotW = cw - padL - padR;
+  const plotH = ch - padT - padB;
+
+  const maxVal = Math.max(...d24.slice(0, 33), ...d13.slice(0, 33)) * 1.1;
+  const X_MAX_IDX = 32; // cut off at score 320
+
+  ctx.clearRect(0, 0, cw, ch);
+
+  // White background
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, cw, ch);
+
+  // Light grid lines
+  ctx.strokeStyle = '#ede9e3';
+  ctx.lineWidth = 1;
+  const yTicks = 4;
+  for (let i = 0; i <= yTicks; i++) {
+    const y = padT + plotH - (i / yTicks) * plotH;
+    ctx.beginPath();
+    ctx.moveTo(padL, y);
+    ctx.lineTo(padL + plotW, y);
+    ctx.stroke();
+    if (i > 0) {
+      ctx.fillStyle = '#a09488';
+      ctx.font = `bold 9px 'Space Mono', monospace`;
+      ctx.textAlign = 'right';
+      ctx.fillText(Math.round(i / yTicks * maxVal) + '%', padL - 5, y + 3);
+    }
+  }
+
+  // Helper: convert data index to x pixel (capped at X_MAX_IDX)
+  function idxToX(i) {
+    return padL + (i / X_MAX_IDX) * plotW;
+  }
+  function valToY(v) {
+    return padT + plotH - (v / maxVal) * plotH;
+  }
+
+  // Gaussian kernel smoother
+  function gaussSmooth(data, sigma) {
+    const radius = Math.ceil(sigma * 3);
+    const kernel = [];
+    let ksum = 0;
+    for (let i = -radius; i <= radius; i++) {
+      const w = Math.exp(-(i * i) / (2 * sigma * sigma));
+      kernel.push(w);
+      ksum += w;
+    }
+    return data.map((_, idx) => {
+      let val = 0;
+      for (let k = 0; k < kernel.length; k++) {
+        const j = idx + k - radius;
+        const src = j < 0 ? data[0] : j >= data.length ? data[data.length - 1] : data[j];
+        val += src * kernel[k];
+      }
+      return val / ksum;
+    });
+  }
+
+  // Draw a smooth filled area for a dataset (clipped to X_MAX_IDX)
+  function drawArea(data, fillColor, strokeColor, alpha) {
+    const smoothed = gaussSmooth(data, 1.5);
+    const pts = smoothed.slice(0, X_MAX_IDX + 1).map((v, i) => [idxToX(i), valToY(v)]);
+
+    // Draw using midpoint quadratic beziers for a fluid line
+    function drawCurve() {
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length - 1; i++) {
+        const mx = (pts[i][0] + pts[i+1][0]) / 2;
+        const my = (pts[i][1] + pts[i+1][1]) / 2;
+        ctx.quadraticCurveTo(pts[i][0], pts[i][1], mx, my);
+      }
+      ctx.lineTo(pts[pts.length-1][0], pts[pts.length-1][1]);
+    }
+
+    ctx.save();
+    ctx.globalAlpha = alpha;
+
+    // Filled area
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], padT + plotH);
+    ctx.lineTo(pts[0][0], pts[0][1]);
+    drawCurve();
+    ctx.lineTo(pts[pts.length-1][0], padT + plotH);
+    ctx.closePath();
+    ctx.fillStyle = fillColor;
+    ctx.fill();
+
+    // Stroke line on top
+    ctx.globalAlpha = 1;
+    ctx.beginPath();
+    drawCurve();
+    ctx.strokeStyle = strokeColor;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Draw 2013 first (behind) in medium blue, then 2024 on top in strong red
+  drawArea(d13, 'rgba(59, 110, 165, 0.2)', '#3b6ea5', 1);
+  drawArea(d24, 'rgba(180, 30, 30, 0.2)', '#b41e1e', 1);
+
+  // Hover vertical line
+  if (hoveredBin >= 0 && hoveredBin < n) {
+    const hx = idxToX(hoveredBin);
+    ctx.strokeStyle = '#c8bfb4';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.moveTo(hx, padT);
+    ctx.lineTo(hx, padT + plotH);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Dots on curves
+    const y24 = valToY(d24[hoveredBin]);
+    const y13 = valToY(d13[hoveredBin]);
+    ctx.fillStyle = '#b41e1e';
+    ctx.beginPath();
+    ctx.arc(hx, y24, 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#3b6ea5';
+    ctx.beginPath();
+    ctx.arc(hx, y13, 4, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Mean lines — use actual averages from data
+  const mean24 = states[stateName].avg2024;
+  const mean13 = states[stateName].avg2013;
+
+  function scoreToX(score) {
+    // Map score 0–320 across the plot width
+    const frac = score / (X_MAX_IDX * 10);
+    return padL + frac * plotW;
+  }
+
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([5, 4]);
+  ctx.strokeStyle = '#b41e1e';
+  const mx24 = scoreToX(mean24);
+  ctx.beginPath(); ctx.moveTo(mx24, padT); ctx.lineTo(mx24, padT + plotH); ctx.stroke();
+
+  ctx.strokeStyle = '#3b6ea5';
+  const mx13 = scoreToX(mean13);
+  ctx.beginPath(); ctx.moveTo(mx13, padT); ctx.lineTo(mx13, padT + plotH); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Mean labels — show only the difference, placed between the two lines
+  const diff = mean24 - mean13;
+  const diffSign = diff >= 0 ? '+' : '';
+  const diffLabel = `${diffSign}${diff.toFixed(1)} pts`;
+  const midX = (mx24 + mx13) / 2;
+
+  ctx.font = `bold 10px 'Space Mono', monospace`;
+  ctx.textAlign = 'center';
+
+  // Small bracket lines connecting the two mean lines at top
+  ctx.strokeStyle = '#888';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(Math.min(mx24, mx13), padT - 8);
+  ctx.lineTo(Math.max(mx24, mx13), padT - 8);
+  ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(mx24, padT - 5); ctx.lineTo(mx24, padT - 11); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(mx13, padT - 5); ctx.lineTo(mx13, padT - 11); ctx.stroke();
+
+  // Diff label — color red if negative, green if positive
+  ctx.fillStyle = diff >= 0 ? '#16a34a' : '#dc2626';
+  ctx.fillText(diffLabel, midX, padT - 15);
+
+  // X labels every 5 bins, up to X_MAX_IDX
+  ctx.fillStyle = '#a09488';
+  ctx.font = `9px 'Space Mono', monospace`;
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= X_MAX_IDX; i += 5) {
+    const x = idxToX(i);
+    ctx.fillText(bins[i].split('-')[0], x, ch - 6);
+  }
+  ctx.fillText('320', idxToX(X_MAX_IDX), ch - 6);
+
+  // Update stats & shift bars
+  updateStats(stateName, d24, d13, mean24, mean13);
+}
+
+function updateStats(stateName, d24, d13, mean24, mean13) {
+  const diff = mean24 - mean13;
+  const nat24 = states['National'].avg2024;
+  const nat13 = states['National'].avg2013;
+  
+  const statsRow = document.getElementById('statsRow');
+  const isPos = diff >= 0;
+  const diffClass = isPos ? 'positive' : 'negative';
+  const diffSign = isPos ? '+' : '';
+
+  const pctBelow200_24 = computePercentBelow(d24, 200);
+  const pctBelow200_13 = computePercentBelow(d13, 200);
+  const lowDiff = (pctBelow200_24 - pctBelow200_13).toFixed(1);
+  const lowDiffSign = lowDiff >= 0 ? '+' : '';
+  const lowClass = lowDiff <= 0 ? 'positive' : 'negative';
+
+  statsRow.innerHTML = `
+    <div class="stat-card">
+      <div class="label">Avg Score 2024</div>
+      <div class="value">${mean24.toFixed(1)}</div>
+      <div class="sub-value">National: ${nat24.toFixed(1)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Avg Score 2013</div>
+      <div class="value">${mean13.toFixed(1)}</div>
+      <div class="sub-value">Natl was: ${nat13.toFixed(1)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Change 2013→2024</div>
+      <div class="value ${diffClass}">${diffSign}${diff.toFixed(1)} pts</div>
+      <div class="sub-value">Natl: ${(nat24 - nat13) >= 0 ? '+' : ''}${(nat24 - nat13).toFixed(1)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">% Below Score 200</div>
+      <div class="value ${lowClass}">${pctBelow200_24}%</div>
+      <div class="sub-value">Was ${pctBelow200_13}% (${lowDiffSign}${lowDiff}pp)</div>
+    </div>
+  `;
+}
+
+// Group shift bars by broad score ranges
+const GROUPS = [
+  { label: '90–170', bins: [9,10,11,12,13,14,15,16] },
+  { label: '170–210', bins: [17,18,19,20] },
+  { label: '210–240', bins: [21,22,23] },
+  { label: '240–270', bins: [24,25,26] },
+  { label: '270–300', bins: [27,28,29] },
+];
+
+function updateShiftBars(d24, d13) {
+  const container = document.getElementById('shiftBars');
+  container.innerHTML = '';
+
+  // Per-group shift
+  const maxAbs = 5;
+
+  GROUPS.forEach(g => {
+    const sum24 = g.bins.reduce((a, i) => a + (d24[i] || 0), 0);
+    const sum13 = g.bins.reduce((a, i) => a + (d13[i] || 0), 0);
+    const diff = sum24 - sum13;
+    const pct = Math.min(Math.abs(diff) / maxAbs * 50, 50);
+    const isPos = diff >= 0;
+    const sign = isPos ? '+' : '';
+
+    const row = document.createElement('div');
+    row.className = 'shift-bar-row';
+    row.innerHTML = `
+      <span class="shift-bar-label">${g.label}</span>
+      <div class="shift-bar-track">
+        <div class="shift-bar-center"></div>
+        <div class="shift-bar-fill ${isPos ? 'pos' : 'neg'}" style="width:${pct}%"></div>
+      </div>
+      <span class="shift-bar-val ${isPos ? 'pos' : 'neg'}">${sign}${diff.toFixed(0)}pp</span>
+    `;
+    container.appendChild(row);
+  });
+
+  // Add all-bin shift bars
+  const container2 = document.getElementById('shiftBars');
+  // actually we already did groups, that's good
+}
+
+function getBinAtX(mouseX) {
+  const rect = canvas.getBoundingClientRect();
+  const cw = canvas.style.width ? parseInt(canvas.style.width) : canvas.clientWidth;
+  const padL = 40, padR = 16;
+  const plotW = cw - padL - padR;
+  const X_MAX_IDX = 32;
+
+  const relX = mouseX - rect.left - padL;
+  if (relX < 0 || relX > plotW) return -1;
+  return Math.round((relX / plotW) * X_MAX_IDX);
+}
+
+canvas.addEventListener('mousemove', (e) => {
+  const binIdx = getBinAtX(e.clientX);
+  if (binIdx !== hoveredBin) {
+    hoveredBin = binIdx;
+    drawChart(currentState);
+  }
+  
+  if (binIdx >= 0 && binIdx < bins.length) {
+    const stateData = states[currentState];
+    const v24 = stateData['2024'][binIdx];
+    const v13 = stateData['2013'][binIdx];
+    const diff = v24 - v13;
+    const diffStr = (diff >= 0 ? '+' : '') + diff;
+
+    tooltip.innerHTML = `
+      <div class="tt-range">${bins[binIdx]}</div>
+      <div class="tt-row"><span class="tt-label">2024</span><span class="tt-val24">${v24}%</span></div>
+      <div class="tt-row"><span class="tt-label">2013</span><span class="tt-val13">${v13}%</span></div>
+      <div class="tt-sep"></div>
+      <div class="tt-row"><span class="tt-label">Change</span><span class="tt-diff">${diffStr}pp</span></div>
+    `;
+    tooltip.style.opacity = '1';
+    const tx = e.clientX + 16;
+    const ty = e.clientY - 40;
+    tooltip.style.left = tx + 'px';
+    tooltip.style.top = ty + 'px';
+  } else {
+    tooltip.style.opacity = '0';
+  }
+});
+
+canvas.addEventListener('mouseleave', () => {
+  hoveredBin = -1;
+  tooltip.style.opacity = '0';
+  drawChart(currentState);
+});
+
+sel.addEventListener('change', () => {
+  currentState = sel.value;
+  drawChart(currentState);
+});
+
+// Initial render
+sel.value = 'National';
+drawChart('National');
+
+// Redraw on resize
+window.addEventListener('resize', () => drawChart(currentState));
+</script>
+</body>
+</html>
